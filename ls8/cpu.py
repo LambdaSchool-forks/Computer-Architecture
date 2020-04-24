@@ -43,18 +43,17 @@ ST = 0b10000100  # 4
 # Other constants
 IM = 5
 IS = 6
-SP = 7  # the stack pointer is stored in the register at index 7
+SP = 7
 
 
 HARDCODE_PROGRAM = [
-            # From print8.ls8
-            0b10000010, # LDI R0,8
-            0b00000000,
-            0b00001000,
-            0b01000111, # PRN R0
-            0b00000000,
-            0b00000001, # HLT
-        ]
+        0b10000010, # LDI R0,8
+        0b00000000,
+        0b00001000,
+        0b01000111, # PRN R0
+        0b00000000,
+        0b00000001, # HLT
+    ]
 
 class CPU:
     """Main CPU class."""
@@ -69,10 +68,10 @@ class CPU:
         self.registers = [0b0] * 8
 
         # internal registers
-        self.pc = 0 # PC: Program Counter, address of the currently executing instruction
-        self.ir = None # IR: Instruction Register, contains a copy of the currently executing instruction
-        self.mar = None # MAR: Memory Address Register, holds the memory address we are reading/writing
-        self.mdr = None # MDR: Memory Data Register, holds the value to write or the value just read
+        self.pc = 0 # PC: Program Counter
+        self.ir = None # IR: Instruction Register
+        self.mar = None # MAR: Memory Address Register
+        self.mdr = None # MDR: Memory Data Register
         self.spl = None # stack pointer location
         self.interrupts_enabled = True
 
@@ -96,9 +95,9 @@ class CPU:
 
 #################################################################################
 #
-# Basic emulator functionalities
+#                          Basic Emulator Functions
 #
-##################################################################################
+#################################################################################
 
     def load(self, program=HARDCODE_PROGRAM):
         """Load a program into memory."""
@@ -108,7 +107,6 @@ class CPU:
             try:
                 with open(program, 'r') as f:
                     for line in f:
-                        # strip out comment, if any, and whitespace
                         instruction = line.split('#')[0].strip()
                         if instruction == '':
                             continue
@@ -131,14 +129,12 @@ class CPU:
 
     def invoke_instruction(self):
         if self.ir in self.branchtable:
-            # print(f"Invoking {bin(self.ir)}")
             self.branchtable[self.ir]()
         else:
             print(f"I did not understand that ir: {bin(self.ir)}")
             sys.exit(1)
 
     def move_pc(self):
-        # grab the fifth digit of the ir
         instruction_sets_pc = ((self.ir << 3) & 255) >> 7
         if not instruction_sets_pc:
             self.pc += (self.num_operands + 1)
@@ -148,11 +144,8 @@ class CPU:
         for i in range(8):
             interrupt_happened = ((masked_interrupts >> i) & 1) == 1
             if interrupt_happened:
-                # pause interrupt checking
                 self.interrupts_enabled = False
-                # reset interrupt
                 self.registers[IS] = self.registers[IS] & (255 - 2**i)
-                # push values to the stack
                 self.registers[SP] -= 1
                 self.ram[self.reg[SP]] = self.registers[self.pc]
                 self.registers[SP] -= 1
@@ -160,7 +153,6 @@ class CPU:
                 for j in range(7):
                     self.registers[SP] -= 1
                     self.ram[self.registers[SP]] = self.registers[j]
-                # set the pc
                 self.pc = self.ram[0xF8 + i]
 
     def trace(self):
@@ -171,8 +163,6 @@ class CPU:
 
         print(f"TRACE: %02X | %02X %02X %02X |" % (
             self.pc,
-            #self.fl,
-            #self.ie,
             self.ram_read(self.pc),
             self.ram_read(self.pc + 1),
             self.ram_read(self.pc + 2)
@@ -207,10 +197,9 @@ class CPU:
 
 #################################################################################
 #
-# Ops
+#                                   Ops
 #
-##################################################################################
-
+#################################################################################
     def ldi(self):
         self.registers[self.operand_a] = self.operand_b
 
@@ -227,13 +216,10 @@ class CPU:
         self.alu('MUL', self.operand_a, self.operand_b)
 
     def st(self):
-        # Store value in regB location to ram location indicated by regA value
         self.ram_write(self.reg[self.operand_b], self.reg[self.operand_a])
 
     def push(self):
-        # move to the next position in the stack
         self.registers[SP] -= 1
-        # assign the value
         self.ram[self.registers[SP]] = self.registers[self.operand_a]
     
     def pop(self):
@@ -245,14 +231,11 @@ class CPU:
             self.registers[SP] += 1
 
     def call(self):
-        # push pc + 2 onto the stack
         self.registers[SP] -= 1
         self.ram[self.registers[SP]] = self.pc + 2
-        # jump to value stored in register
         self.jmp()
     
     def jmp(self):
-        # set pc to value stored in register
         self.pc = self.registers[self.operand_a]
 
     def ret(self):
@@ -260,9 +243,9 @@ class CPU:
 
 #################################################################################
 #
-# Emulator run
+#                                  Emulator run
 #
-##################################################################################
+#################################################################################
 
     def run(self):
         """Run the CPU."""
@@ -274,7 +257,6 @@ class CPU:
         while True:
             if timer:
                 if time.time() > interrupt_time:
-                    # Set bit 0 of the IS register (R6)
                     self.reg[6] = self.reg[6] | 0b00000001
                     interrupt_time = time.time() + 60
             if self.interrupts_enabled:
